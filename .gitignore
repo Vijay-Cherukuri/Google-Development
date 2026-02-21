@@ -1,0 +1,8 @@
+# Ignore Google Cloud Keys
+*.json
+
+# Ignore temporary files
+.DS_Store
+Thumbs.db
+__pycache__/
+.env
