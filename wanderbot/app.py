@@ -37,16 +37,55 @@ ESCALATION PROTOCOL:
 """
 
 generate_content_config = types.GenerateContentConfig(
-    system_instruction=[
-        types.Part.from_text(text=system_instructions)
-    ],
+    system_instruction=[types.Part.from_text(text=system_instructions)],
+    tools=[tools] # Pass the tool definition here
 )
 logging.info(f"[generate_config_details] System Instruction: {generate_content_config.system_instruction[0].text}")
 
 # --- Tooling ---
 # TODO: Define the weather tool function declaration
+weather_function = {
+    "name": "get_current_temperatur",
+    "description": "Get the current temperature for a given location.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "location": {
+                "type": "string",
+                "description": "The city name, e.g. San Francisco",
+            },
+        },
+        "required": ["location"],
+    },
+}
 
 # TODO: Define the get_current_temperature function
+def get_current_temperature(location: str) -> str:
+    """Gets the current temperature for a given location."""
+
+    try:
+        # --- Get the latitude and longitude for the location ---
+        geocode_url = f"https://geocoding-api.open-meteo.com/v1/search?name={location}&count=1&language=en&format=json"
+        geocode_response = requests.get(geocode_url)
+        geocode_data = geocode_response.json()
+
+        if not geocode_data.get("results"):
+            return f"Could not find coordinates for {location}"
+
+        lat = geocode_data["results"][0]["latitude"]
+        lon = geocode_data["results"][0]["longitude"]
+
+        # --- Get weather for the coordinates ---
+        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
+        weather_response = requests.get(weather_url)
+        weather_data = weather_response.json()
+
+        temperature = weather_data["current_weather"]["temperature"]
+        unit = "°C"
+
+        return f"{temperature}{unit}"
+    except Exception as e:
+        return f"Error fetching weather: {e}"
 
 # --- Initialize the Vertex AI Client
 try:
@@ -63,6 +102,8 @@ except Exception as e:
     st.stop()
 
 # TODO: Add the get_chat function here in Task 15.
+tools = types.Tool(function_declarations=[weather_function])
+
 
 # --- Call the Model ---
 def call_model(prompt: str, model_name: str) -> str:
