@@ -102,6 +102,12 @@ except Exception as e:
     st.stop()
 
 # TODO: Add the get_chat function here in Task 15.
+def get_chat(model_name: str):
+    return client.chats.create(
+        model=model_name,
+        config=generate_content_config,
+    )
+
 tools = types.Tool(function_declarations=[weather_function])
 
 
@@ -112,11 +118,16 @@ def call_model(prompt: str, model_name: str) -> str:
     It will be replaced in a later step with a more advanced version that handles tooling.
     """
     try:
-
+        chat = get_chat(model_name)
         # TODO: Prepare the content for the model
+        response = chat.send_message(message_content)
         contents = [prompt]
         # TODO: Define generate_content configuration (needed for system instructions and parameters)
-
+        if function_call.name == "get_current_temperature":
+            response = get_current_temperature(**function_call.args)
+        function_response.parts = types.Part._from_response(name=function_call.name, response={"result": result})
+        message_content = [function_response_part]
+            
         # TODO: Define response
         response = client.models.generate_content(
             model=model_name,
@@ -169,3 +180,7 @@ contents = [
         parts=user_message_parts, # A list, allowing multiple types of content
     )
 ]
+chat = client.chats.create(
+    model=GEMINI_MODEL_NAME,
+    config=generate_content_config,
+)
