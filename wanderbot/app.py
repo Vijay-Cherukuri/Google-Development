@@ -37,8 +37,9 @@ ESCALATION PROTOCOL:
 """
 
 generate_content_config = types.GenerateContentConfig(
-    system_instruction=[types.Part.from_text(text=system_instructions)],
-    tools=[tools] # Pass the tool definition here
+    system_instruction=[
+        types.Part.from_text(text=system_instructions)
+    ],
 )
 logging.info(f"[generate_config_details] System Instruction: {generate_content_config.system_instruction[0].text}")
 
@@ -71,7 +72,7 @@ def get_current_temperature(location: str) -> str:
 
         if not geocode_data.get("results"):
             return f"Could not find coordinates for {location}"
-
+        
         lat = geocode_data["results"][0]["latitude"]
         lon = geocode_data["results"][0]["longitude"]
 
@@ -103,39 +104,90 @@ except Exception as e:
 
 # TODO: Add the get_chat function here in Task 15.
 def get_chat(model_name: str):
-    return client.chats.create(
-        model=model_name,
-        config=generate_content_config,
-    )
+    if f"chat-{model_name}" not in st.session_state:
 
-tools = types.Tool(function_declarations=[weather_function])
+        # TODO: Define the tools configuration for the model
+        tools = types.Tool(function_declarations=[weather_function])
 
+        # TODO: Define the generate_content configuration, including tools
+        generate_content_config = types.GenerateContentConfig(
+            temperature=temperature,
+            top_p=top_p,
+            system_instruction=[types.Part.from_text(text=system_instructions)],
+            tools=[tools] # Pass the tool definition here
+        )
+        # TODO: Create a new chat session
+        chat = client.chats.create(
+            model=model_name,
+            config=generate_content_config,
+        )
+
+        st.session_state[f"chat-{model_name}"] = chat
+    return st.session_state[f"chat-{model_name}"]
 
 # --- Call the Model ---
+# def call_model(prompt: str, model_name: str) -> str:
+#     """
+#     This function interacts with a large language model (LLM) to generate text based on a given prompt and system instructions.
+#     It will be replaced in a later step with a more advanced version that handles tooling.
+#     """
+#     try:
+
+#         # TODO: Prepare the content for the model
+#         contents = [prompt]
+#         # TODO: Define generate_content configuration (needed for system instructions and parameters)
+
+#         # TODO: Define response
+#         response = client.models.generate_content(
+#             model=model_name,
+#             contents=contents,
+#             config=generate_content_config, # This is the new line
+#         )
+#         logging.info(f"[call_model_response] LLM Response: \"{response.text}\"")
+#         # TODO: Uncomment the below "return response.text" line
+#         return response.text
+#     except Exception as e:
+#         return f"Error: {e}"
+
 def call_model(prompt: str, model_name: str) -> str:
     """
-    This function interacts with a large language model (LLM) to generate text based on a given prompt and system instructions.
-    It will be replaced in a later step with a more advanced version that handles tooling.
+    This function interacts with a large language model (LLM) to generate text based on a given prompt.
+    It maintains a chat session and handles function calls from the model to external tools.
     """
     try:
+        # TODO: Get the existing chat session or create a new one.
         chat = get_chat(model_name)
-        # TODO: Prepare the content for the model
-        response = chat.send_message(message_content)
-        contents = [prompt]
-        # TODO: Define generate_content configuration (needed for system instructions and parameters)
-        if function_call.name == "get_current_temperature":
-            response = get_current_temperature(**function_call.args)
-        function_response.parts = types.Part._from_response(name=function_call.name, response={"result": result})
-        message_content = [function_response_part]
-            
-        # TODO: Define response
-        response = client.models.generate_content(
-            model=model_name,
-            contents=contents,
-            config=generate_content_config, # This is the new line
-        )
-        logging.info(f"[call_model_response] LLM Response: \"{response.text}\"")
-        # TODO: Uncomment the below "return response.text" line
+        message_content = prompt
+
+        # Start the tool-calling loop
+        while True:
+            # TODO: Send the signal to the model.
+            response = chat.send_message(message_content)
+            # Check if the model wants to call a tool
+            has_tool_calls = False
+            for part in response.candidates[0].content.parts:
+                if part.function_call:
+                    has_tool_calls = True
+                    function_call = part.function_call
+                    logging.info(f"Function to call: {function_call.name}")
+                    logging.info(f"Arguments: {function_call.args}")
+
+                    # TODO: Call the appropriate function if the model requests it.
+                    if function_call.name == "get_current_temperature":
+                        result = get_current_temperature(**function_call.args)
+                        function_response_part = types.Part.from_function_response(
+                            name=function_call.name,
+                            response={"result": result},
+                        )
+                        message_content = [function_response_part]
+                elif part.text:
+                    logging.info("No function call found in the response.")
+                    logging.info(response.text)
+            # If no tool call was made, break the loop
+            if not has_tool_calls:
+                break
+
+        # TODO: Return the model's final text response.
         return response.text
     except Exception as e:
         return f"Error: {e}"
@@ -180,7 +232,3 @@ contents = [
         parts=user_message_parts, # A list, allowing multiple types of content
     )
 ]
-chat = client.chats.create(
-    model=GEMINI_MODEL_NAME,
-    config=generate_content_config,
-)
