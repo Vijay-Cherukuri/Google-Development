@@ -1,10 +1,19 @@
-from urllib import response
+import logging
+import requests
+import sys
 
 import streamlit as st
+
 from google import genai
+from urllib import response
+
 from google.genai import types
-import requests
-import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
 # --- Defining variables and parameters ---
 REGION = "global"
@@ -46,7 +55,7 @@ logging.info(f"[generate_config_details] System Instruction: {generate_content_c
 # --- Tooling ---
 # TODO: Define the weather tool function declaration
 weather_function = {
-    "name": "get_current_temperatur",
+    "name": "get_current_temperature",
     "description": "Get the current temperature for a given location.",
     "parameters": {
         "type": "object",
